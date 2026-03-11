@@ -57,6 +57,80 @@ function getReviews(id) {
   return 20 + (Math.abs(id.split('').reduce((a,c)=>a+c.charCodeAt(0),0)) % 480);
 }
 
+/* ── Smart Hours Generator ─────────────────────── */
+const CAT_HOURS = {
+  hospital:    {open:'00:00', close:'23:59', always:true},
+  pharmacy:    {open:'08:00', close:'22:00'},
+  clinic:      {open:'09:00', close:'20:00'},
+  dentist:     {open:'10:00', close:'19:00'},
+  restaurant:  {open:'10:00', close:'23:00'},
+  cafe:        {open:'07:00', close:'21:00'},
+  bakery:      {open:'07:00', close:'20:00'},
+  fast_food:   {open:'09:00', close:'23:59'},
+  grocery:     {open:'08:00', close:'21:00'},
+  atm:         {open:'00:00', close:'23:59', always:true},
+  bank:        {open:'10:00', close:'16:00', closedSun:true},
+  mechanic:    {open:'09:00', close:'19:00', closedSun:true},
+  car_wash:    {open:'09:00', close:'20:00'},
+  petrol_pump: {open:'00:00', close:'23:59', always:true},
+  salon:       {open:'10:00', close:'20:00'},
+  laundry:     {open:'08:00', close:'20:00'},
+  plumber:     {open:'08:00', close:'20:00'},
+  electrician: {open:'08:00', close:'20:00'},
+  ac_repair:   {open:'09:00', close:'19:00'},
+  carpenter:   {open:'09:00', close:'18:00', closedSun:true},
+  painter:     {open:'08:00', close:'18:00', closedSun:true},
+  police:      {open:'00:00', close:'23:59', always:true},
+  fire:        {open:'00:00', close:'23:59', always:true},
+  ambulance:   {open:'00:00', close:'23:59', always:true},
+};
+
+function getHoursInfo(cat, id) {
+  const def = CAT_HOURS[cat] || {open:'09:00', close:'18:00'};
+  
+  // Slight variation per service (±30 min) using id hash
+  const hash = id.split('').reduce((a,c)=>a+c.charCodeAt(0),0);
+  const variance = (hash % 3) * 30; // 0, 30, or 60 min
+  
+  if(def.always) {
+    return { openTime:'Open 24 Hours', closeTime:'', isOpen:true, always:true };
+  }
+  
+  const [oh, om] = def.open.split(':').map(Number);
+  const [ch, cm] = def.close.split(':').map(Number);
+  
+  const openMins  = oh * 60 + om - variance;
+  const closeMins = ch * 60 + cm + variance;
+  
+  const fmt = m => {
+    const h = Math.floor(m/60) % 24;
+    const min = m % 60;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return `${h12}:${String(min).padStart(2,'0')} ${ampm}`;
+  };
+
+  const now = new Date();
+  const nowMins = now.getHours()*60 + now.getMinutes();
+  const isSunday = now.getDay() === 0;
+  
+  const isOpen = !isSunday || !def.closedSun
+    ? (nowMins >= openMins && nowMins < closeMins)
+    : false;
+
+  const closingSoon = isOpen && (closeMins - nowMins) <= 60;
+
+  return {
+    openTime:  fmt(openMins),
+    closeTime: fmt(closeMins),
+    isOpen,
+    closingSoon,
+    closedSunday: def.closedSun && isSunday,
+    hoursStr: `${fmt(openMins)} – ${fmt(closeMins)}`,
+  };
+}
+
+
 /* ── State ─────────────────────────────────────── */
 const S = {
   lat:null, lng:null,
@@ -242,8 +316,10 @@ function parseEls(els,cat,uLat,uLng){
       rating:   pseudoRating(id),
       reviews:  getReviews(id),
       busy:     getBusy(id),
+      hoursInfo: getHoursInfo(cat, id),
       phone:    t.phone||t['contact:phone']||'',
       hours:    t.opening_hours||'',
+      _hoursOverride: null,
     };
   }).filter(Boolean).sort((a,b)=>a.dist-b.dist);
 }
@@ -257,7 +333,12 @@ async function loadServices(cat,osmTag){
   EL.fbEmoji.textContent=m.emoji; EL.fbName.textContent=m.label; EL.fbCount.textContent='Loading…';
   showState('load'); EL.stLoadSub.textContent=`Querying OpenStreetMap for ${m.label}s…`;
   EL.resultsSec.classList.add('vis');
-  document.body.style.overflow='hidden';
+  if(window.innerWidth > 820) {
+    document.body.style.overflow = 'hidden';
+  } else {
+    document.body.style.overflow = '';
+    EL.resultsSec.scrollIntoView({behavior:'smooth', block:'start'});
+  }
   setTimeout(()=>S.map?.invalidateSize(),350);
   try {
     const els=await fetchOverpass(S.lat,S.lng,osmTag,5000);
@@ -345,7 +426,15 @@ function buildCard(svc,idx){
         <i class="fas fa-map-marker-alt"></i>
         <span>${svc.address}</span>
       </div>
-      ${svc.hours?`<div class="card-open"><i class="fas fa-clock"></i>${svc.hours}</div>`:''}
+      ${(()=>{
+        const h = svc.hoursInfo;
+        if(!h) return '';
+        if(h.always) return `<div class="card-open open-status always"><span class="os-dot"></span><span class="os-label">Open 24 Hours</span></div>`;
+        if(h.closedSunday) return `<div class="card-open open-status closed"><span class="os-dot"></span><span class="os-label">Closed Today (Sunday)</span></div>`;
+        if(h.closingSoon) return `<div class="card-open open-status closing"><span class="os-dot"></span><span class="os-label">Closing Soon · ${h.closeTime}</span><span class="os-time">${h.hoursStr}</span></div>`;
+        if(h.isOpen) return `<div class="card-open open-status open"><span class="os-dot"></span><span class="os-label">Open Now</span><span class="os-time">${h.hoursStr}</span></div>`;
+        return `<div class="card-open open-status closed"><span class="os-dot"></span><span class="os-label">Closed · Opens ${h.openTime}</span><span class="os-time">${h.hoursStr}</span></div>`;
+      })()}
     </div>
     <div class="card-actions">
       ${svc.phone
@@ -533,7 +622,7 @@ function openCompareModal(){
           <div class="cmp-row"><span class="cmp-row-label">Reviews</span><span class="cmp-row-val ${rvWin?'winner':'loser'}">${A.reviews}</span></div>
           <div class="cmp-row"><span class="cmp-row-label">Busy Status</span><span class="cmp-busy ${A.busy.cls}">${A.busy.dot} ${A.busy.label}</span></div>
           <div class="cmp-row"><span class="cmp-row-label">Address</span><span class="cmp-row-val" style="font-size:12px;font-weight:500;white-space:normal">${A.address}</span></div>
-          <div class="cmp-row"><span class="cmp-row-label">Hours</span><span class="cmp-row-val" style="font-size:12px;font-weight:500">${A.hours||'Not listed'}</span></div>
+          <div class="cmp-row"><span class="cmp-row-label">Hours</span><span class="cmp-row-val" style="font-size:12px;font-weight:500">${A.hoursInfo?.hoursStr||A.hours||'Not listed'}</span></div>
         </div>
       </div>
 
@@ -551,7 +640,7 @@ function openCompareModal(){
           <div class="cmp-row"><span class="cmp-row-label">Reviews</span><span class="cmp-row-val ${!rvWin?'winner':'loser'}">${B.reviews}</span></div>
           <div class="cmp-row"><span class="cmp-row-label">Busy Status</span><span class="cmp-busy ${B.busy.cls}">${B.busy.dot} ${B.busy.label}</span></div>
           <div class="cmp-row"><span class="cmp-row-label">Address</span><span class="cmp-row-val" style="font-size:12px;font-weight:500;white-space:normal">${B.address}</span></div>
-          <div class="cmp-row"><span class="cmp-row-label">Hours</span><span class="cmp-row-val" style="font-size:12px;font-weight:500">${B.hours||'Not listed'}</span></div>
+          <div class="cmp-row"><span class="cmp-row-label">Hours</span><span class="cmp-row-val" style="font-size:12px;font-weight:500">${B.hoursInfo?.hoursStr||B.hours||'Not listed'}</span></div>
         </div>
       </div>
     </div>
@@ -741,7 +830,12 @@ function bind(){
   EL.fReset.addEventListener('click',()=>{EL.fRating.value='0';EL.fDist.value='9999';EL.fBusy.value='all';EL.navSearch.value='';EL.heroSearch.value='';EL.navClear.classList.remove('show');applyFilters()});
 
   /* Back */
-  EL.fbBack.addEventListener('click',()=>{EL.resultsSec.classList.remove('vis');document.body.style.overflow='';document.querySelectorAll('.cc').forEach(c=>c.classList.remove('active'));window.scrollTo({top:0,behavior:'smooth'})});
+  EL.fbBack.addEventListener('click',()=>{
+  EL.resultsSec.classList.remove('vis');
+  document.body.style.overflow='';
+  document.querySelectorAll('.cc').forEach(c=>c.classList.remove('active'));
+  window.scrollTo({top:0,behavior:'smooth'});
+});
 
   /* Retry */
   EL.btnRetry.addEventListener('click',()=>{if(S.cat)loadServices(S.cat,S.osmTag)});
