@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NearFind Pro — Nearby Service Finder</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     SPLASH LOADER
+══════════════════════════════════════ -->
+<div class="splash" id="splash">
+  <div class="splash-bg">
+    <div class="splash-orb so1"></div>
+    <div class="splash-orb so2"></div>
+    <div class="splash-grid"></div>
+  </div>
+  <div class="splash-center">
+    <div class="splash-logo">
+      <div class="sl-ring r1"></div>
+      <div class="sl-ring r2"></div>
+      <div class="sl-ring r3"></div>
+      <div class="sl-pin"><i class="fas fa-location-crosshairs"></i></div>
+    </div>
+    <h1 class="splash-name">Near<span>Find</span> <em>Pro</em></h1>
+    <p class="splash-sub">Discover services around you</p>
+    <div class="splash-bar-wrap"><div class="splash-bar" id="splashBar"></div></div>
+    <p class="splash-msg" id="splashMsg">Initialising…</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     MAIN APP
+══════════════════════════════════════ -->
+<div class="app" id="app">
+
+  <!-- NAVBAR -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-logo">
+      <div class="nav-logo-mark"><i class="fas fa-location-crosshairs"></i></div>
+      <span>Near<em>Find</em> <sup>Pro</sup></span>
+    </div>
+    <div class="nav-search-wrap">
+      <div class="nav-search-box">
+        <i class="fas fa-magnifying-glass"></i>
+        <input id="navSearchInput" type="text" placeholder="Search any service…" autocomplete="off"/>
+        <button class="nav-clear-btn" id="navClear"><i class="fas fa-xmark"></i></button>
+      </div>
+      <ul class="ac-drop" id="navAcDrop"></ul>
+    </div>
+    <div class="nav-end">
+      <button class="nav-icon-btn" id="favNavBtn" title="Favourites">
+        <i class="fas fa-heart"></i>
+        <span class="nb" id="favBadge">0</span>
+      </button>
+      <button class="nav-icon-btn" id="compareNavBtn" title="Compare List" style="display:none">
+        <i class="fas fa-code-compare"></i>
+        <span class="nb compare-nb" id="compareBadge">0</span>
+      </button>
+      <button class="nav-icon-btn" id="themeBtn" title="Toggle theme">
+        <i class="fas fa-moon" id="themeIco"></i>
+      </button>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero" id="heroSec">
+    <div class="hero-bg">
+      <div class="hero-orb ho1"></div>
+      <div class="hero-orb ho2"></div>
+    </div>
+    <div class="hero-body">
+      <div class="hero-pill"><span class="live-dot"></span> Live OpenStreetMap · Free · No API Key</div>
+      <h1 class="hero-h1">Find Services<br/><span class="hero-hl">Near You</span></h1>
+      <p class="hero-p">Hospitals, mechanics, restaurants, salons &amp; 30+ more — real-time results around your GPS location.</p>
+      <div class="hero-search-shell">
+        <div class="hero-search-box">
+          <i class="fas fa-magnifying-glass hs-ico"></i>
+          <input id="heroSearchInput" class="hs-input" type="text" placeholder="plumber, hospital, restaurant…" autocomplete="off"/>
+          <div class="hs-sep"></div>
+          <button class="hs-loc" id="heroLocBtn"><i class="fas fa-crosshairs"></i><span>My Location</span></button>
+          <button class="hs-go" id="heroGoBtn"><i class="fas fa-arrow-right"></i></button>
+        </div>
+        <ul class="ac-drop" id="heroAcDrop"></ul>
+      </div>
+      <div class="hero-tags">
+        <span class="h-tag"><i class="fas fa-layer-group"></i> 30+ Categories</span>
+        <span class="h-tag"><i class="fas fa-bolt"></i> Real-Time</span>
+        <span class="h-tag"><i class="fas fa-code-compare"></i> Compare</span>
+        <span class="h-tag"><i class="fas fa-clock-rotate-left"></i> History</span>
+        <span class="h-tag"><i class="fas fa-star"></i> Recommendations</span>
+      </div>
+    </div>
+    <div class="hero-arrow" id="heroArrow"><i class="fas fa-chevron-down"></i></div>
+  </section>
+
+  <!-- RECENTLY VIEWED -->
+  <section class="dash-section" id="recentSec" style="display:none">
+    <div class="ds-header">
+      <div class="ds-title"><i class="fas fa-clock-rotate-left"></i> Recently Viewed</div>
+      <button class="ds-clear" id="recentClear">Clear All</button>
+    </div>
+    <div class="horiz-scroll" id="recentGrid"></div>
+  </section>
+
+  <!-- RECOMMENDED -->
+  <section class="dash-section" id="recommendSec" style="display:none">
+    <div class="ds-header">
+      <div class="ds-title"><i class="fas fa-wand-magic-sparkles"></i> Recommended for You</div>
+      <span class="ds-badge">Based on ratings &amp; distance</span>
+    </div>
+    <div class="horiz-scroll" id="recommendGrid"></div>
+  </section>
+
+  <!-- CATEGORIES -->
+  <section class="cat-section" id="catSec">
+    <div class="sec-head">
+      <h2 class="sec-title">Browse Categories</h2>
+      <p class="sec-sub">Click a category to see live results near you</p>
+    </div>
+    <div class="cat-groups" id="catGroups">
+
+      <div class="cat-grp">
+        <div class="cg-label"><i class="fas fa-house"></i> Home Services</div>
+        <div class="cat-grid">
+          <button class="cc" data-cat="plumber"     data-osm="craft=plumber">        <div class="cc-ico" style="--cc:#3b82f6">🔧</div><span>Plumber</span></button>
+          <button class="cc" data-cat="electrician" data-osm="craft=electrician">    <div class="cc-ico" style="--cc:#facc15">⚡</div><span>Electrician</span></button>
+          <button class="cc" data-cat="ac_repair"   data-osm="shop=appliance">       <div class="cc-ico" style="--cc:#06b6d4">❄️</div><span>AC Repair</span></button>
+          <button class="cc" data-cat="carpenter"   data-osm="craft=carpenter">      <div class="cc-ico" style="--cc:#a16207">🪚</div><span>Carpenter</span></button>
+          <button class="cc" data-cat="painter"     data-osm="craft=painter">        <div class="cc-ico" style="--cc:#ec4899">🎨</div><span>Painter</span></button>
+        </div>
+      </div>
+
+      <div class="cat-grp">
+        <div class="cg-label"><i class="fas fa-utensils"></i> Food &amp; Dining</div>
+        <div class="cat-grid">
+          <button class="cc" data-cat="restaurant"  data-osm="amenity=restaurant">   <div class="cc-ico" style="--cc:#f97316">🍽️</div><span>Restaurant</span></button>
+          <button class="cc" data-cat="cafe"        data-osm="amenity=cafe">         <div class="cc-ico" style="--cc:#92400e">☕</div><span>Cafe</span></button>
+          <button class="cc" data-cat="bakery"      data-osm="shop=bakery">          <div class="cc-ico" style="--cc:#d97706">🥐</div><span>Bakery</span></button>
+          <button class="cc" data-cat="fast_food"   data-osm="amenity=fast_food">    <div class="cc-ico" style="--cc:#ef4444">🍔</div><span>Fast Food</span></button>
+        </div>
+      </div>
+
+      <div class="cat-grp">
+        <div class="cg-label"><i class="fas fa-heart-pulse"></i> Health</div>
+        <div class="cat-grid">
+          <button class="cc" data-cat="hospital"    data-osm="amenity=hospital">     <div class="cc-ico" style="--cc:#ef4444">🏥</div><span>Hospital</span></button>
+          <button class="cc" data-cat="pharmacy"    data-osm="amenity=pharmacy">     <div class="cc-ico" style="--cc:#a855f7">💊</div><span>Pharmacy</span></button>
+          <button class="cc" data-cat="dentist"     data-osm="amenity=dentist">      <div class="cc-ico" style="--cc:#0ea5e9">🦷</div><span>Dentist</span></button>
+          <button class="cc" data-cat="clinic"      data-osm="amenity=clinic">       <div class="cc-ico" style="--cc:#10b981">🩺</div><span>Clinic</span></button>
+        </div>
+      </div>
+
+      <div class="cat-grp">
+        <div class="cg-label"><i class="fas fa-car"></i> Vehicle Services</div>
+        <div class="cat-grid">
+          <button class="cc" data-cat="mechanic"    data-osm="shop=car_repair">      <div class="cc-ico" style="--cc:#6b7280">🔩</div><span>Mechanic</span></button>
+          <button class="cc" data-cat="car_wash"    data-osm="amenity=car_wash">     <div class="cc-ico" style="--cc:#38bdf8">🚿</div><span>Car Wash</span></button>
+          <button class="cc" data-cat="petrol_pump" data-osm="amenity=fuel">         <div class="cc-ico" style="--cc:#f59e0b">⛽</div><span>Petrol Pump</span></button>
+        </div>
+      </div>
+
+      <div class="cat-grp">
+        <div class="cg-label"><i class="fas fa-basket-shopping"></i> Daily Needs</div>
+        <div class="cat-grid">
+          <button class="cc" data-cat="grocery"     data-osm="shop=supermarket">     <div class="cc-ico" style="--cc:#22c55e">🛒</div><span>Grocery</span></button>
+          <button class="cc" data-cat="atm"         data-osm="amenity=atm">          <div class="cc-ico" style="--cc:#10b981">🏧</div><span>ATM</span></button>
+          <button class="cc" data-cat="bank"        data-osm="amenity=bank">         <div class="cc-ico" style="--cc:#0ea5e9">🏦</div><span>Bank</span></button>
+          <button class="cc" data-cat="laundry"     data-osm="shop=laundry">         <div class="cc-ico" style="--cc:#8b5cf6">🧺</div><span>Laundry</span></button>
+          <button class="cc" data-cat="salon"       data-osm="shop=hairdresser">     <div class="cc-ico" style="--cc:#ec4899">✂️</div><span>Salon</span></button>
+        </div>
+      </div>
+
+      <div class="cat-grp">
+        <div class="cg-label emg-label"><i class="fas fa-triangle-exclamation"></i> Emergency</div>
+        <div class="cat-grid">
+          <button class="cc emg" data-cat="police"    data-osm="amenity=police">        <div class="cc-ico" style="--cc:#1d4ed8">👮</div><span>Police</span></button>
+          <button class="cc emg" data-cat="fire"      data-osm="amenity=fire_station">  <div class="cc-ico" style="--cc:#dc2626">🚒</div><span>Fire Station</span></button>
+          <button class="cc emg" data-cat="ambulance" data-osm="amenity=hospital">      <div class="cc-ico" style="--cc:#ef4444">🚑</div><span>Ambulance</span></button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section class="results-sec" id="resultsSec">
+    <!-- Filter bar -->
+    <div class="filter-bar" id="filterBar">
+      <div class="fb-left">
+        <button class="fb-back" id="fbBack"><i class="fas fa-arrow-left"></i></button>
+        <span class="fb-emoji" id="fbEmoji"></span>
+        <strong class="fb-name" id="fbName">Results</strong>
+        <span class="fb-count" id="fbCount">0 found</span>
+      </div>
+      <div class="fb-right">
+        <div class="fp"><i class="fas fa-star"></i>
+          <select class="fsel" id="fRating">
+            <option value="0">All Ratings</option>
+            <option value="3">3+ ★</option>
+            <option value="4">4+ ★</option>
+            <option value="4.5">4.5+ ★</option>
+          </select>
+        </div>
+        <div class="fp"><i class="fas fa-route"></i>
+          <select class="fsel" id="fDist">
+            <option value="9999">Any Distance</option>
+            <option value="500">500 m</option>
+            <option value="1000">1 km</option>
+            <option value="2000">2 km</option>
+            <option value="5000">5 km</option>
+          </select>
+        </div>
+        <div class="fp"><i class="fas fa-circle-half-stroke"></i>
+          <select class="fsel" id="fBusy">
+            <option value="all">All Status</option>
+            <option value="low">🟢 Not Busy</option>
+            <option value="medium">🟡 Moderate</option>
+            <option value="high">🔴 Very Busy</option>
+          </select>
+        </div>
+        <button class="fb-reset" id="fReset" title="Reset filters"><i class="fas fa-rotate-left"></i></button>
+      </div>
+    </div>
+
+    <!-- Split -->
+    <div class="split" id="split">
+      <!-- Cards -->
+      <div class="cards-col" id="cardsCol">
+        <div class="p-state" id="stLoad">
+          <div class="tri-load"><div class="tl"></div><div class="tl t2"></div><div class="tl t3"></div></div>
+          <p class="ps-title">Fetching live services…</p>
+          <p class="ps-sub" id="stLoadSub">Querying OpenStreetMap</p>
+        </div>
+        <div class="p-state" id="stEmpty" style="display:none">
+          <div class="ps-emoji">🗺️</div>
+          <p class="ps-title">Nothing found nearby</p>
+          <p class="ps-sub">Try expanding distance or pick another category</p>
+          <button class="ps-btn" id="btnRetry">Try Again</button>
+        </div>
+        <div class="p-state" id="stErr" style="display:none">
+          <div class="ps-emoji">⚠️</div>
+          <p class="ps-title">Could not load data</p>
+          <p class="ps-sub" id="stErrMsg">Check your internet connection</p>
+          <button class="ps-btn" id="btnErrRetry">Retry</button>
+        </div>
+        <div class="cards-grid" id="cardsGrid"></div>
+      </div>
+      <!-- Map -->
+      <div class="map-col" id="mapCol">
+        <div id="map"></div>
+        <div class="map-fabs">
+          <button class="mf" id="mfCenter" title="My location"><i class="fas fa-crosshairs"></i></button>
+          <button class="mf" id="mfExpand" title="Fullscreen"><i class="fas fa-expand-alt"></i></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">NearFind Pro © 2025 — Data: <a href="https://openstreetmap.org" target="_blank">OpenStreetMap</a></footer>
+</div>
+
+<!-- ══════════════════════════════════════
+     COMPARE FLOATING BAR
+══════════════════════════════════════ -->
+<div class="compare-bar" id="compareBar">
+  <div class="cb-left">
+    <i class="fas fa-code-compare"></i>
+    <span id="cbLabel">Select 2 services to compare</span>
+    <div class="cb-slots" id="cbSlots"></div>
+  </div>
+  <div class="cb-right">
+    <button class="cb-go" id="cbGo" disabled>Compare Now</button>
+    <button class="cb-clear" id="cbClear">✕ Clear</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     COMPARE MODAL
+══════════════════════════════════════ -->
+<div class="modal-ov" id="compareOv">
+  <div class="cmp-modal" id="cmpModal">
+    <div class="cmp-head">
+      <h2><i class="fas fa-code-compare"></i> Service Comparison</h2>
+      <button class="modal-x" id="cmpClose"><i class="fas fa-xmark"></i></button>
+    </div>
+    <div class="cmp-body" id="cmpBody"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     FAVOURITES MODAL
+══════════════════════════════════════ -->
+<div class="modal-ov" id="favOv">
+  <div class="fav-modal">
+    <div class="fav-head">
+      <h2><i class="fas fa-heart"></i> Saved Favourites</h2>
+      <button class="modal-x" id="favClose"><i class="fas fa-xmark"></i></button>
+    </div>
+    <div class="fav-body" id="favBody"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
